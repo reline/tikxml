@@ -103,9 +103,14 @@ public final class TikXml {
     this.config = config;
   }
 
+  @SuppressWarnings("unchecked")
   public <T> T read(BufferedSource source, Type clazz) throws IOException {
 
     XmlReader reader = XmlReader.of(source);
+
+    if (reader.hasDocTypeDefinition()) {
+      reader.skipDocTypeDefinition();
+    }
 
     reader.beginElement();
     reader.nextElementName(); // We don't care about the name of the root tag

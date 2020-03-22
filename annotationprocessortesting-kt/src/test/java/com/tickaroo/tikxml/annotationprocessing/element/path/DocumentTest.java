@@ -94,4 +94,12 @@ public class DocumentTest {
     Assert.assertEquals(document, document2);
 
   }
+
+  @Test
+  public void skipDocumentTypeDefinition() throws Exception {
+    TikXml xml = new TikXml.Builder().build();
+    Document document = xml.read(TestUtils.sourceForFile("document_type_definition.xml"), Document.class);
+    Assert.assertNotNull(document);
+    Assert.assertNotNull(document.getImage());
+  }
 }

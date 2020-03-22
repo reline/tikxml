@@ -52,8 +52,6 @@ public class XmlReader implements Closeable {
   private static final byte SINGLE_QUOTE = '\'';
   private static final byte OPENING_XML_ELEMENT = '<';
   private static final byte CLOSING_XML_ELEMENT = '>';
-  private static final byte OPENING_DOCTYPE_BRACKET = '[';
-  private static final byte CLOSING_DOCTYPE_BRACKET = ']';
 
   //
   // Peek states
@@ -79,6 +77,9 @@ public class XmlReader implements Closeable {
 
   /** Peeked a CDATA */
   private static final int PEEKED_CDATA = 9;
+
+  /** Peeked DOCTYPE */
+  private static final int PEEKED_DOCTYPE = 10;
 
   /** The input XML. */
   private int peeked = PEEKED_NONE;
@@ -129,6 +130,9 @@ public class XmlReader implements Closeable {
     switch (p) {
       case PEEKED_ELEMENT_BEGIN:
         return XmlToken.ELEMENT_BEGIN;
+
+      case PEEKED_DOCTYPE:
+        return XmlToken.DOCTYPE;
 
       case PEEKED_ELEMENT_NAME:
         return XmlToken.ELEMENT_NAME;
@@ -289,8 +293,8 @@ public class XmlReader implements Closeable {
                 + ">");
           }
         } else if (peekStack == XmlScope.EMPTY_DOCUMENT && isDocTypeDefinition()) {
-          skipDocTypeDefinition();
-          return doPeek();
+          buffer.readByte();  // consume '<'
+          return peeked = PEEKED_DOCTYPE;
         }
         // its just a < which means begin of the element
         buffer.readByte(); // consume '<'.
@@ -319,6 +323,14 @@ public class XmlReader implements Closeable {
     return fillBuffer(CDATA_OPEN.size()) && buffer.rangeEquals(0, CDATA_OPEN);
   }
 
+  public boolean hasDocTypeDefinition() throws IOException {
+    int p = peeked;
+    if (p == PEEKED_NONE) {
+      p = doPeek();
+    }
+    return p == PEEKED_DOCTYPE;
+  }
+
   /**
    * Checks for DOCTYPE beginning {@code <!DOCTYPE }. This method doesn't consume the opening <!DOCTYPE
    * Tag
@@ -336,7 +348,16 @@ public class XmlReader implements Closeable {
    *
    * @throws IOException
    */
-  private void skipDocTypeDefinition() throws IOException {
+  public void skipDocTypeDefinition() throws IOException {
+    int p = peeked;
+    if (p == PEEKED_NONE) {
+      p = doPeek();
+    }
+    if (p != PEEKED_DOCTYPE) {
+      throw new XmlDataException("Expected " + XmlToken.DOCTYPE + " but was " + peek()
+              + " at path " + getPath());
+    }
+
     pushStack(XmlScope.ELEMENT_OPENING);
     long fromIndex = DOCTYPE_OPEN.size();
     long index = fromIndex;
@@ -354,6 +375,7 @@ public class XmlReader implements Closeable {
       }
     }
     buffer.skip(index + 1); // consume entire DOCTYPE
+    peeked = PEEKED_NONE;
   }
 
   /**
@@ -1117,6 +1139,11 @@ public class XmlReader implements Closeable {
    */
 
   public enum XmlToken {
+    /**
+     * Indicates a document type definition (DTD)
+     */
+    DOCTYPE,
+
     /**
      * Indicates that an xml element begins.
      */

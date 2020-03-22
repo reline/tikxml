@@ -1023,6 +1023,9 @@ public class XmlReaderTest {
                 "<!DOCTYPE rootelement SYSTEM \"file.dtd\"><root\nanAttribute=\"1\"\n attributeWithWhiteSpace=\"2\" \n   \t\tattributeWithTabs=\"20.2\">\n<child>Contains\nmulitlines\n</child>\n</root>";
         XmlReader reader = readerFrom(xml);
 
+        Assert.assertEquals(XmlReader.XmlToken.DOCTYPE, reader.peek());
+        Assert.assertTrue(reader.hasDocTypeDefinition());
+        reader.skipDocTypeDefinition();
         reader.beginElement();
         Assert.assertEquals("root", reader.nextElementName());
         Assert.assertEquals("anAttribute", reader.nextAttributeName());
@@ -1047,6 +1050,9 @@ public class XmlReaderTest {
                 "<!doctype rootelement SYSTEM \"file.dtd\"><root\nanAttribute=\"1\"\n attributeWithWhiteSpace=\"2\" \n   \t\tattributeWithTabs=\"20.2\">\n<child>Contains\nmulitlines\n</child>\n</root>";
         XmlReader reader = readerFrom(xml);
 
+        Assert.assertTrue(reader.hasDocTypeDefinition());
+        Assert.assertEquals(XmlReader.XmlToken.DOCTYPE, reader.peek());
+        reader.skipDocTypeDefinition();
         reader.beginElement();
         Assert.assertEquals("root", reader.nextElementName());
         Assert.assertEquals("anAttribute", reader.nextAttributeName());
@@ -1076,6 +1082,9 @@ public class XmlReaderTest {
                 "<root anAttribute=\"1\"\n attributeWithWhiteSpace=\"2\" \n   \t\tattributeWithTabs=\"20.2\">\n<child>Contains\nmulitlines\n</child>\n</root>";
         XmlReader reader = readerFrom(xml);
 
+        Assert.assertEquals(XmlReader.XmlToken.DOCTYPE, reader.peek());
+        Assert.assertTrue(reader.hasDocTypeDefinition());
+        reader.skipDocTypeDefinition();
         reader.beginElement();
         Assert.assertEquals("root", reader.nextElementName());
         Assert.assertEquals("anAttribute", reader.nextAttributeName());
@@ -1097,6 +1106,9 @@ public class XmlReaderTest {
     public void notADocTypeDefinitionButSameDoctypeAsTag() throws IOException {
         String xml = "<!DOCTYPE foo><!DOCTYPE bar><DOCTYPE />";
         try (XmlReader reader = readerFrom(xml)) {
+            Assert.assertEquals(XmlReader.XmlToken.DOCTYPE, reader.peek());
+            Assert.assertTrue(reader.hasDocTypeDefinition());
+            reader.skipDocTypeDefinition();
             reader.beginElement();
             exception.expect(IOException.class);
             exception.expectMessage("Expected xml element name (literal expected) at path /");
@@ -1129,6 +1141,21 @@ public class XmlReaderTest {
             exception.expect(IOException.class);
             exception.expectMessage("Expected xml element name (literal expected) at path /");
             reader.nextElementName();
+        }
+    }
+
+    @Test
+    public void doctypeOnlyShouldHaveDoctype() throws IOException {
+        String xml = "<!DOCTYPE []>";
+        try (XmlReader reader = readerFrom(xml)) {
+            Assert.assertFalse(reader.hasElement());
+            Assert.assertEquals(XmlReader.XmlToken.DOCTYPE, reader.peek());
+            Assert.assertTrue(reader.hasDocTypeDefinition());
+            reader.skipDocTypeDefinition();
+            Assert.assertFalse(reader.hasElement());
+            exception.expect(XmlDataException.class);
+            exception.expectMessage("Expected ELEMENT_BEGIN but was END_OF_DOCUMENT at path /");
+            reader.beginElement();
         }
     }
 
