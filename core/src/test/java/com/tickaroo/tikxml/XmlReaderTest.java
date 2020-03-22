@@ -162,6 +162,18 @@ public class XmlReaderTest {
     }
 
     @Test
+    public void readElementNameWithExclamation() throws IOException {
+        String xml = "<!invalidelement>text element</!invalidelement>";
+
+        try (XmlReader reader = readerFrom(xml)) {
+            reader.beginElement();
+            exception.expect(IOException.class);
+            exception.expectMessage("Expected xml element name (literal expected) at path /");
+            reader.nextElementName();
+        }
+    }
+
+    @Test
     public void emptyTextContent() throws IOException {
         String xml = "<element></element>";
         XmlReader reader = readerFrom(xml);
@@ -1109,15 +1121,13 @@ public class XmlReaderTest {
     @Test
     public void doctypeAsChildIsNotAllowed() throws IOException {
         String xml = "<root><!DOCTYPE foo></root>";
-        try {
-            XmlReader reader = readerFrom(xml);
+        try (XmlReader reader = readerFrom(xml)) {
             reader.beginElement();
             Assert.assertEquals("root", reader.nextElementName());
             reader.beginElement();
-            Assert.fail("Excpetion expected");
-        } catch (IOException e) {
-            // TODO Should doctype gets it's own error message?
-            Assert.assertEquals("Unterminated comment at path /root/text()", e.getMessage());
+            exception.expect(IOException.class);
+            exception.expectMessage("Expected xml element name (literal expected) at path /");
+            reader.nextElementName();
         }
     }
 

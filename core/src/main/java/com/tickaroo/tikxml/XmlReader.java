@@ -43,6 +43,7 @@ public class XmlReader implements Closeable {
   private static final ByteString CDATA_CLOSE = ByteString.encodeUtf8("]]>");
   private static final ByteString CDATA_OPEN = ByteString.encodeUtf8("<![CDATA[");
   private static final ByteString DOCTYPE_OPEN = ByteString.encodeUtf8("<!DOCTYPE");
+  private static final ByteString COMMENT_OPEN = ByteString.encodeUtf8("<!--");
   private static final ByteString COMMENT_CLOSE = ByteString.encodeUtf8("-->");
   private static final ByteString XML_DECLARATION_CLOSE = ByteString.encodeUtf8("?>");
   private static final ByteString UTF8_BOM = ByteString.of((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);
@@ -828,7 +829,7 @@ public class XmlReader implements Closeable {
           // TODO inline DOCTYPE.
           p = 0;
           continue;
-        } else if (peek == '!' && fillBuffer(4)) {
+        } else if (peek == '!' && fillBuffer(4) && source.rangeEquals(0, COMMENT_OPEN)) {
           long index = source.indexOf(COMMENT_CLOSE, 4); // skip <!-- in comparison by offset 4
           if (index == -1) {
             throw syntaxError("Unterminated comment");
@@ -952,6 +953,7 @@ public class XmlReader implements Closeable {
       case '>':
       case '/':
       case ' ':
+      case '!':
         return false;
       default:
         return true;
