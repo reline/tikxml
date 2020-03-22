@@ -1095,12 +1095,13 @@ public class XmlReaderTest {
 
     @Test
     public void notADocTypeDefinitionButSameDoctypeAsTag() throws IOException {
-
         String xml = "<!DOCTYPE foo><!DOCTYPE bar><DOCTYPE />";
-        XmlReader reader = readerFrom(xml);
-        reader.beginElement();
-        Assert.assertEquals("DOCTYPE", reader.nextElementName());
-        Assert.assertFalse(reader.hasElement());
+        try (XmlReader reader = readerFrom(xml)) {
+            reader.beginElement();
+            exception.expect(IOException.class);
+            exception.expectMessage("Expected xml element name (literal expected) at path /");
+            reader.nextElementName();
+        }
     }
 
 

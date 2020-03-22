@@ -266,11 +266,9 @@ public class XmlReader implements Closeable {
 
       // Handling open < and closing </
       case '<':
-        buffer.readByte(); // consume '<'.
-
         // Check if </ which means end of element
-        if (fillBuffer(1) && buffer.getByte(0) == '/') {
-
+        if (fillBuffer(2) && buffer.getByte(1) == '/') {
+          buffer.readByte(); // consume '<'.
           buffer.readByte(); // consume /
 
           // Check if it is the corresponding xml element name
@@ -290,8 +288,12 @@ public class XmlReader implements Closeable {
                 + closingElementName
                 + ">");
           }
+        } else if (peekStack == XmlScope.EMPTY_DOCUMENT && isDocTypeDefinition()) {
+          skipDocTypeDefinition();
+          return doPeek();
         }
         // its just a < which means begin of the element
+        buffer.readByte(); // consume '<'.
         return peeked = PEEKED_ELEMENT_BEGIN;
 
       case '"':
@@ -327,6 +329,31 @@ public class XmlReader implements Closeable {
   private boolean isDocTypeDefinition() throws IOException {
     return buffer.size() >= DOCTYPE_OPEN.size() &&
             buffer.snapshot(DOCTYPE_OPEN.size()).toAsciiUppercase().equals(DOCTYPE_OPEN);
+  }
+
+  /**
+   * Skip the DOCTYPE definition in its entirety {@code <!DOCTYPE}. This method consumes the the opening <!DOCTYPE
+   *
+   * @throws IOException
+   */
+  private void skipDocTypeDefinition() throws IOException {
+    pushStack(XmlScope.ELEMENT_OPENING);
+    long fromIndex = DOCTYPE_OPEN.size();
+    long index = fromIndex;
+    while (stack[stackSize - 1] != XmlScope.NONEMPTY_DOCUMENT) {
+      index = source.indexOfElement(ByteString.of(OPENING_XML_ELEMENT, CLOSING_XML_ELEMENT), fromIndex);
+      if (index == -1) {
+        throw syntaxError("Unterminated <!DOCTYPE expected closing >");
+      }
+      fromIndex = index + 1;
+      byte b = buffer.getByte(index);
+      if (b == OPENING_XML_ELEMENT) {
+        pushStack(XmlScope.ELEMENT_OPENING);
+      } else if (b == CLOSING_XML_ELEMENT) {
+        popStack();
+      }
+    }
+    buffer.skip(index + 1); // consume entire DOCTYPE
   }
 
   /**
@@ -808,28 +835,8 @@ public class XmlReader implements Closeable {
       if (c == '<' && !isCDATA() && fillBuffer(2)) {
 
         byte peek = buffer.getByte(1);
-        int peekStack = stack[stackSize - 1];
 
-        if (peekStack == XmlScope.NONEMPTY_DOCUMENT && isDocTypeDefinition()) {
-          long index = source.indexOf(CLOSING_XML_ELEMENT, DOCTYPE_OPEN.size());
-          if (index == -1) {
-            throw syntaxError("Unterminated <!DOCTYPE> . Inline DOCTYPE is not support at the moment.");
-          }
-          // check if doctype uses brackets
-          long bracketIndex = source.indexOf(OPENING_DOCTYPE_BRACKET, DOCTYPE_OPEN.size(), index);
-          if (bracketIndex != -1) {
-            index = source.indexOf(ByteString.of(CLOSING_DOCTYPE_BRACKET, CLOSING_XML_ELEMENT), index + bracketIndex);
-            if (index == -1) {
-              throw syntaxError("Unterminated <!DOCTYPE []>. Expected closing ]>");
-            }
-            source.skip(index + 2); // skip behind ]>
-          } else {
-            source.skip(index + 1); // skip behind >
-          }
-          // TODO inline DOCTYPE.
-          p = 0;
-          continue;
-        } else if (peek == '!' && fillBuffer(4) && source.rangeEquals(0, COMMENT_OPEN)) {
+        if (peek == '!' && fillBuffer(4) && source.rangeEquals(0, COMMENT_OPEN)) {
           long index = source.indexOf(COMMENT_CLOSE, 4); // skip <!-- in comparison by offset 4
           if (index == -1) {
             throw syntaxError("Unterminated comment");
